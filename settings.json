@@ -14,5 +14,8 @@
     "type": "command",
     "command": "~/.claude/statusline.sh"
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true
+  }
 }

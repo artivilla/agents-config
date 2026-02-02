@@ -164,7 +164,7 @@ main() {
         echo -e "${BOLD}Dry run - showing what would be done:${RESET}"
         echo ""
     else
-        echo "Installing Claude Code config from $CONFIG_DIR"
+        echo "Installing agent config from $CONFIG_DIR"
         echo ""
     fi
 
