@@ -1,12 +1,12 @@
-# claude-config
+# agents-config
 
-My [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration - settings and skills.
+Currenlty supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration with settings and skills
 
 ## Quick start
 
 ```bash
-git clone https://github.com/brianlovin/claude-config.git
-cd claude-config
+git clone https://github.com/artivilla/agents-config.git
+cd agents-config
 ./install.sh
 ```
 
@@ -100,7 +100,7 @@ Machine-specific permissions accumulate in `~/.claude/settings.local.json` (auto
 Fork this repo and customize! The structure is simple:
 
 ```
-claude-config/
+agents-config/
 ├── settings.json      # Claude Code settings
 ├── statusline.sh      # Optional statusline script
 ├── skills/            # Skills (subdirectories with SKILL.md)
@@ -112,4 +112,4 @@ claude-config/
 ## See also
 
 - [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
-- [My dotfiles](https://github.com/brianlovin/dotfiles) - Shell, git, SSH config
+- [My dotfiles](https://github.com/artivilla/dotfiles) - Shell, git, SSH config

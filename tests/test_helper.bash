@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test helper for claude-config tests
+# Test helper for agents-config tests
 # Provides setup/teardown and utility functions
 
 # Get the directory containing the test files
