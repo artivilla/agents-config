@@ -5,6 +5,8 @@ CONFIG_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKUP_DIR="$CONFIG_DIR/.backup"
 DRY_RUN=false
 
+source "$CONFIG_DIR/lib.sh"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -134,6 +136,32 @@ show_dir_status() {
     done
 }
 
+# show status for skills in a specific agent directory
+show_dir_status_for_path() {
+    local skills_path="$1"
+
+    for item in "$skills_path"/*/; do
+        [ -d "$item" ] || continue
+        item_name=$(basename "$item")
+        item_path="$skills_path/$item_name"
+
+        if [ -L "$item_path" ]; then
+            target=$(readlink "$item_path")
+            if [[ "$target" == "$CONFIG_DIR"* ]]; then
+                echo -e "    ${GREEN}✓${RESET} $item_name (synced)"
+            else
+                echo -e "    ${BLUE}→${RESET} $item_name (symlink to elsewhere)"
+            fi
+        else
+            if [ -d "$CONFIG_DIR/skills/$item_name" ]; then
+                echo -e "    ${YELLOW}⚠${RESET} $item_name (exists in both - local copy)"
+            else
+                echo -e "    ${RESET}○${RESET} $item_name (local only)"
+            fi
+        fi
+    done
+}
+
 # Show status for a file-based item (agents, rules)
 show_file_status() {
     local type="$1"
@@ -163,14 +191,20 @@ show_file_status() {
 }
 
 show_status() {
-    echo -e "${BOLD}Claude Config Sync Status${RESET}"
+    echo -e "${BOLD}Agent Configs Sync Status${RESET}"
     echo "========================="
     echo ""
 
     echo -e "${BOLD}Skills:${RESET}"
-    if [ -d "$HOME/.claude/skills" ] && [ -n "$(ls -A "$HOME/.claude/skills" 2>/dev/null)" ]; then
-        show_dir_status "skills"
-    else
+    local has_any_skills=false
+    while IFS=$'\t' read -r agent_name agent_skills_path; do
+        if [ -d "$agent_skills_path" ] && [ -n "$(ls -A "$agent_skills_path" 2>/dev/null)" ]; then
+            has_any_skills=true
+            echo -e "  ${BOLD}$agent_name${RESET} ($agent_skills_path):"
+            show_dir_status_for_path "$agent_skills_path"
+        fi
+    done < <(get_enabled_agents "$CONFIG_DIR/agents.conf")
+    if ! $has_any_skills; then
         echo "  (none)"
     fi
     echo ""
@@ -252,6 +286,15 @@ add_skill() {
     ln -s "$dest" "$src"
 
     echo -e "${GREEN}✓${RESET} Skill '$name' added and symlinked"
+
+    # symlink to other enabled agents
+    while IFS=$'\t' read -r agent_name agent_skills_path; do
+        [[ "$agent_name" == "claude" ]] && continue
+        mkdir -p "$agent_skills_path"
+        ln -sfn "$dest" "$agent_skills_path/$name"
+        echo -e "${GREEN}✓${RESET} Also linked to $agent_name ($agent_skills_path/$name)"
+    done < <(get_enabled_agents "$CONFIG_DIR/agents.conf")
+
     echo -e "${BLUE}Backup saved:${RESET} $backup_path"
     echo "  Run: ./sync.sh push"
 }
@@ -329,7 +372,17 @@ remove_skill() {
 
     rm -rf "$dest"
 
-    echo -e "${GREEN}✓${RESET} Skill '$name' removed from repo (kept as local)"
+    # remove symlinks from other enabled agents
+    while IFS=$'\t' read -r agent_name agent_skills_path; do
+        [[ "$agent_name" == "claude" ]] && continue
+        local agent_dest="$agent_skills_path/$name"
+        if [ -L "$agent_dest" ] && [[ "$(readlink "$agent_dest")" == "$CONFIG_DIR"* ]]; then
+            rm "$agent_dest"
+            echo -e "${GREEN}✓${RESET} Removed from $agent_name"
+        fi
+    done < <(get_enabled_agents "$CONFIG_DIR/agents.conf")
+
+    echo -e "${GREEN}✓${RESET} Skill '$name' removed from repo (kept as local in claude)"
     echo -e "${BLUE}Backup saved:${RESET} $backup_path"
     echo "  Run: ./sync.sh push"
 }
@@ -484,28 +537,32 @@ undo_last() {
     echo ""
     echo "Restoring..."
 
-    # Restore each item in the backup
-    for item in "$backup_path"/.claude/*; do
-        [ -e "$item" ] || continue
-        local item_name=$(basename "$item")
-        local dest="$HOME/.claude/$item_name"
+    # restore each item in the backup (walks all top-level dirs, not just .claude)
+    for top_dir in "$backup_path"/*/; do
+        [ -d "$top_dir" ] || continue
+        local dir_name=$(basename "$top_dir")
 
-        if [[ "$item" == *.symlink ]]; then
-            # Restore symlink
-            local target=$(cat "$item")
-            local real_dest="${dest%.symlink}"
-            rm -rf "$real_dest"
-            ln -s "$target" "$real_dest"
-            echo -e "${GREEN}✓${RESET} Restored symlink: $real_dest -> $target"
-        elif [ -d "$item" ]; then
-            rm -rf "$dest"
-            cp -r "$item" "$dest"
-            echo -e "${GREEN}✓${RESET} Restored directory: $dest"
-        else
-            rm -f "$dest"
-            cp "$item" "$dest"
-            echo -e "${GREEN}✓${RESET} Restored file: $dest"
-        fi
+        for item in "$top_dir"/*; do
+            [ -e "$item" ] || continue
+            local item_name=$(basename "$item")
+            local dest="$HOME/$dir_name/$item_name"
+
+            if [[ "$item" == *.symlink ]]; then
+                local target=$(cat "$item")
+                local real_dest="${dest%.symlink}"
+                rm -rf "$real_dest"
+                ln -s "$target" "$real_dest"
+                echo -e "${GREEN}✓${RESET} Restored symlink: $real_dest -> $target"
+            elif [ -d "$item" ]; then
+                rm -rf "$dest"
+                cp -r "$item" "$dest"
+                echo -e "${GREEN}✓${RESET} Restored directory: $dest"
+            else
+                rm -f "$dest"
+                cp "$item" "$dest"
+                echo -e "${GREEN}✓${RESET} Restored file: $dest"
+            fi
+        done
     done
 
     # Mark backup as used by renaming
@@ -537,22 +594,32 @@ validate_all_skills() {
         done
     fi
 
-    # Check local-only skills
-    if [ -d "$HOME/.claude/skills" ]; then
-        for skill in "$HOME/.claude/skills"/*/; do
-            [ -d "$skill" ] || continue
-            # Skip if it's a symlink to our repo (already checked)
-            if [ -L "$skill" ] && [[ "$(readlink "$skill")" == "$CONFIG_DIR"* ]]; then
-                continue
-            fi
-            ((checked++)) || true
-            if ! validate_skill "$skill"; then
-                has_errors=true
-            else
-                echo -e "${GREEN}✓${RESET} $(basename "$skill") (local)"
-            fi
-        done
-    fi
+    # check local-only skills across all enabled agent directories
+    local checked_local=()
+    while IFS=$'\t' read -r agent_name agent_skills_path; do
+        if [ -d "$agent_skills_path" ]; then
+            for skill in "$agent_skills_path"/*/; do
+                [ -d "$skill" ] || continue
+                if [ -L "$skill" ] && [[ "$(readlink "$skill")" == "$CONFIG_DIR"* ]]; then
+                    continue
+                fi
+                local sname=$(basename "$skill")
+                # skip if already checked from another agent dir
+                local already_checked=false
+                for c in "${checked_local[@]}"; do
+                    [[ "$c" == "$sname" ]] && already_checked=true && break
+                done
+                $already_checked && continue
+                checked_local+=("$sname")
+                ((checked++)) || true
+                if ! validate_skill "$skill"; then
+                    has_errors=true
+                else
+                    echo -e "${GREEN}✓${RESET} $sname (local - $agent_name)"
+                fi
+            done
+        fi
+    done < <(get_enabled_agents "$CONFIG_DIR/agents.conf")
 
     echo ""
     if [ $checked -eq 0 ]; then

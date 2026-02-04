@@ -6,6 +6,8 @@ BACKUP_DIR="$CONFIG_DIR/.backup"
 DRY_RUN=false
 FORCE=false
 
+source "$CONFIG_DIR/lib.sh"
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -124,7 +126,7 @@ handle_conflict() {
     echo "  [q] Quit"
 
     while true; do
-        read -p "Choice [r/l/d/q]: " choice
+        read -p "Choice [r/l/d/q]: " choice < /dev/tty
         case $choice in
             r|R)
                 backup_item "$dest" "$backup_path"
@@ -232,39 +234,47 @@ main() {
         fi
     fi
 
-    # Skills (directory symlinks per skill)
+    # Skills (directory symlinks per skill, per enabled agent)
     if [ -d "$CONFIG_DIR/skills" ] && [ -n "$(ls -A "$CONFIG_DIR/skills" 2>/dev/null)" ]; then
-        mkdir -p ~/.claude/skills
-        for skill in "$CONFIG_DIR/skills"/*/; do
-            [ -d "$skill" ] || continue
-            skill_name=$(basename "$skill")
-            local dest=~/.claude/skills/"$skill_name"
-
+        while IFS=$'\t' read -r agent_name agent_skills_path; do
             if $DRY_RUN; then
-                if has_conflict "$dest"; then
-                    dry_run_msg "Would backup and replace skills/$skill_name"
-                else
-                    dry_run_msg "Would link skills/$skill_name"
-                fi
+                dry_run_msg "Agent: $agent_name ($agent_skills_path)"
             else
-                if has_conflict "$dest"; then
-                    [ -z "$backup_path" ] && backup_path=$(create_backup)
-                    if handle_conflict "$skill" "$dest" "$backup_path" "skills/$skill_name"; then
-                        backed_up_items+=("skills/$skill_name")
-                        rm -rf "$dest"
-                        ln -sfn "$skill" "$dest"
-                        echo -e "${GREEN}✓${RESET} skills/$skill_name (replaced, backup saved)"
-                        has_changes=true
+                echo -e "${BOLD}Skills -> $agent_name${RESET} ($agent_skills_path)"
+                mkdir -p "$agent_skills_path"
+            fi
+
+            for skill in "$CONFIG_DIR/skills"/*/; do
+                [ -d "$skill" ] || continue
+                skill_name=$(basename "$skill")
+                local dest="$agent_skills_path/$skill_name"
+
+                if $DRY_RUN; then
+                    if has_conflict "$dest"; then
+                        dry_run_msg "  Would backup and replace skills/$skill_name"
                     else
-                        echo -e "${YELLOW}○${RESET} skills/$skill_name (kept local)"
+                        dry_run_msg "  Would link skills/$skill_name"
                     fi
                 else
-                    ln -sfn "$skill" "$dest"
-                    echo -e "${GREEN}✓${RESET} skills/$skill_name"
-                    has_changes=true
+                    if has_conflict "$dest"; then
+                        [ -z "$backup_path" ] && backup_path=$(create_backup)
+                        if handle_conflict "$skill" "$dest" "$backup_path" "$agent_name/skills/$skill_name"; then
+                            backed_up_items+=("$agent_name/skills/$skill_name")
+                            rm -rf "$dest"
+                            ln -sfn "$skill" "$dest"
+                            echo -e "${GREEN}✓${RESET} skills/$skill_name (replaced, backup saved)"
+                            has_changes=true
+                        else
+                            echo -e "${YELLOW}○${RESET} skills/$skill_name (kept local)"
+                        fi
+                    else
+                        ln -sfn "$skill" "$dest"
+                        echo -e "${GREEN}✓${RESET} skills/$skill_name"
+                        has_changes=true
+                    fi
                 fi
-            fi
-        done
+            done
+        done < <(get_enabled_agents "$CONFIG_DIR/agents.conf")
     fi
 
     # Agents (file symlinks per agent)
@@ -349,9 +359,11 @@ main() {
             echo ""
         fi
 
-        echo "Done! Claude Code config installed."
+        local enabled_agents
+        enabled_agents="$(get_enabled_agents "$CONFIG_DIR/agents.conf" | cut -f1 | paste -sd', ' -)"
+        echo "Done! Config installed for: $enabled_agents"
         echo ""
-        echo "Local-only items in ~/.claude/ are preserved."
+        echo "Local-only items are preserved."
         echo "Use ./sync.sh to manage what gets shared."
     fi
 }

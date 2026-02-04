@@ -19,6 +19,12 @@ setup_test_env() {
     # Copy scripts to fake repo
     cp "$PROJECT_DIR/install.sh" "$FAKE_REPO/"
     cp "$PROJECT_DIR/sync.sh" "$FAKE_REPO/"
+    cp "$PROJECT_DIR/lib.sh" "$FAKE_REPO/"
+
+    # Default agents.conf with just claude pointing to fake home
+    cat > "$FAKE_REPO/agents.conf" << EOF
+claude=$FAKE_HOME/.claude/skills
+EOF
 
     # Make scripts use fake HOME
     # We'll override HOME when running scripts
@@ -248,4 +254,13 @@ run_install() {
 run_sync() {
     cd "$FAKE_REPO"
     HOME="$FAKE_HOME" bash ./sync.sh "$@"
+}
+
+# Create a multi-agent config for testing
+create_multi_agent_conf() {
+    cat > "$FAKE_REPO/agents.conf" << EOF
+claude=$FAKE_HOME/.claude/skills
+codex=$FAKE_HOME/.codex/skills
+gemini=$FAKE_HOME/.gemini/skills
+EOF
 }

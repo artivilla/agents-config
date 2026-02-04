@@ -207,3 +207,92 @@ teardown() {
     [[ -d "$FAKE_HOME/.claude/skills/local-skill" ]]
     [[ -f "$FAKE_HOME/.claude/skills/local-skill/SKILL.md" ]]
 }
+
+# =============================================================================
+# Multi-Agent Installation Tests
+# =============================================================================
+
+@test "install.sh symlinks skills to multiple agents" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+    run_install
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.gemini/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+}
+
+@test "install.sh creates agent skill directories" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+    run_install
+    assert_dir "$FAKE_HOME/.codex/skills"
+    assert_dir "$FAKE_HOME/.gemini/skills"
+}
+
+@test "install.sh only installs skills to enabled agents" {
+    # default conf has only claude
+    create_fake_skill "test-skill"
+    run_install
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    [[ ! -d "$FAKE_HOME/.codex/skills" ]]
+}
+
+@test "install.sh agents/rules stay claude-only with multi-agent" {
+    create_multi_agent_conf
+    create_fake_agent "test-agent"
+    create_fake_rule "test-rule"
+    run_install
+    assert_symlink "$FAKE_HOME/.claude/agents/test-agent.md" "$FAKE_REPO/agents/test-agent.md"
+    assert_symlink "$FAKE_HOME/.claude/rules/test-rule.md" "$FAKE_REPO/rules/test-rule.md"
+    [[ ! -e "$FAKE_HOME/.codex/agents" ]]
+    [[ ! -e "$FAKE_HOME/.gemini/rules" ]]
+}
+
+@test "install.sh --dry-run shows per-agent output" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+    run run_install --dry-run
+    [[ "$output" == *"codex"* ]]
+    [[ "$output" == *"gemini"* ]]
+}
+
+@test "install.sh handles conflict in one agent independently" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+    # create conflict only in codex
+    mkdir -p "$FAKE_HOME/.codex/skills/test-skill"
+    echo "local" > "$FAKE_HOME/.codex/skills/test-skill/README.md"
+
+    run_install --force
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_backup_exists
+}
+
+@test "install.sh falls back to claude-only without agents.conf" {
+    rm -f "$FAKE_REPO/agents.conf"
+    create_fake_skill "test-skill"
+    run_install
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+}
+
+@test "install.sh multi-agent is idempotent" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+
+    run_install
+    run_install
+
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.gemini/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+}
+
+@test "install.sh shows enabled agents in done message" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+    run run_install
+    [[ "$output" == *"claude"* ]]
+    [[ "$output" == *"codex"* ]]
+    [[ "$output" == *"gemini"* ]]
+}

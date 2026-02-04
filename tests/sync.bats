@@ -17,7 +17,7 @@ teardown() {
 
 @test "sync.sh shows status by default" {
     run run_sync
-    [[ "$output" == *"Claude Config Sync Status"* ]]
+    [[ "$output" == *"Agent Configs Sync Status"* ]]
     [[ "$output" == *"Legend:"* ]]
 }
 
@@ -248,4 +248,43 @@ teardown() {
     create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
     run run_sync add --dry-run skill my-skill
     [[ "$output" == *"[dry-run]"* ]]
+}
+
+# =============================================================================
+# Multi-Agent Sync Tests
+# =============================================================================
+
+@test "sync.sh status shows skills per agent" {
+    create_multi_agent_conf
+    create_fake_skill "test-skill"
+    run_install
+    run run_sync
+    [[ "$output" == *"claude"* ]]
+    [[ "$output" == *"codex"* ]]
+    [[ "$output" == *"gemini"* ]]
+}
+
+@test "sync.sh add skill symlinks to all enabled agents" {
+    create_multi_agent_conf
+    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
+    run_sync add skill my-skill
+    assert_symlink "$FAKE_HOME/.claude/skills/my-skill" "$FAKE_REPO/skills/my-skill"
+    assert_symlink "$FAKE_HOME/.codex/skills/my-skill" "$FAKE_REPO/skills/my-skill"
+    assert_symlink "$FAKE_HOME/.gemini/skills/my-skill" "$FAKE_REPO/skills/my-skill"
+}
+
+@test "sync.sh remove skill cleans up all agent symlinks" {
+    create_multi_agent_conf
+    create_fake_skill "my-skill"
+    run_install
+    run_sync remove skill my-skill
+
+    # repo copy gone
+    [[ ! -d "$FAKE_REPO/skills/my-skill" ]]
+    # claude kept as local
+    assert_dir "$FAKE_HOME/.claude/skills/my-skill"
+    [[ ! -L "$FAKE_HOME/.claude/skills/my-skill" ]]
+    # other agents cleaned up
+    [[ ! -L "$FAKE_HOME/.codex/skills/my-skill" ]]
+    [[ ! -L "$FAKE_HOME/.gemini/skills/my-skill" ]]
 }

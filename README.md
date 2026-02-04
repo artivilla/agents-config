@@ -1,6 +1,6 @@
 # agents-config
 
-Currenlty supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration with settings and skills
+Personal AI agent configuration with settings and skills, synced across machines across agent harnesses via symlinks. Supports configurable agent harnesses.
 
 ## Quick start
 
@@ -89,6 +89,21 @@ bats tests/validation.bats
 
 Tests run in isolated temp directories and don't affect your actual `~/.claude` config.
 
+## Multi-agent support
+
+Skills can be symlinked to multiple AI agent directories. Edit `agents.conf` to enable agents:
+
+```
+claude=~/.claude/skills
+# codex=~/.codex/skills
+# amp=~/.config/agents/skills
+# antigravity=~/.gemini/antigravity/global_skills
+# droid=~/.factory/skills
+# gemini=~/.gemini/skills
+```
+
+Uncomment any agent you use, then run `./install.sh`. Skills are symlinked to all enabled agents. Settings, agents, and rules remain Claude-only.
+
 ## Local-only config
 
 Not everything needs to be synced. The install script only creates symlinks for what's in this repo - it won't delete your local-only skills.
@@ -101,15 +116,14 @@ Fork this repo and customize! The structure is simple:
 
 ```
 agents-config/
-├── settings.json      # Claude Code settings
+├── settings.json      # claude code settings
 ├── statusline.sh      # Optional statusline script
+├── agents.conf        # Which agents to install skills to
+├── lib.sh             # Shared functions for scripts
 ├── skills/            # Skills (subdirectories with SKILL.md)
 ├── agents/            # Subagent definitions
 ├── rules/             # Rule files
 └── tests/             # Bats tests
 ```
 
-## See also
-
-- [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
-- [My dotfiles](https://github.com/artivilla/dotfiles) - Shell, git, SSH config
+Inspired and adapted from [@brianlovin](https://github.com/brianlovin/claude-config) claude code configs

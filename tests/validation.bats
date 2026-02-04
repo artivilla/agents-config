@@ -94,7 +94,7 @@ EOF
     [[ "$status" -eq 0 ]]
     [[ "$output" == *"repo-skill"* ]]
     [[ "$output" == *"local-skill"* ]]
-    [[ "$output" == *"(local)"* ]]
+    [[ "$output" == *"(local"* ]]
 }
 
 @test "sync.sh validate doesn't double-count synced skills" {
@@ -106,7 +106,7 @@ EOF
     # Should only appear once (as synced, not as local)
     # grep -c counts lines, not occurrences, and we expect exactly 1 line with "my-skill"
     local count
-    count=$(echo "$output" | grep "my-skill" | grep -v "(local)" | wc -l | tr -d ' ')
+    count=$(echo "$output" | grep "my-skill" | grep -v "(local" | wc -l | tr -d ' ')
     [[ "$count" -eq 1 ]]
 }
 

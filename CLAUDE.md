@@ -1,6 +1,6 @@
-# Claude Config
+# agent config
 
-Personal Claude Code settings, skills, agents, and rules, synced across machines via symlinks.
+Personal agent setting settings, skills, agents, and rules, synced across machines via symlinks.
 
 ## Commands
 
@@ -28,8 +28,10 @@ See [.claude/rules/testing.md](.claude/rules/testing.md) for testing conventions
 
 ## Key Files
 
-- `install.sh` - Creates symlinks from ~/.claude to this repo
+- `install.sh` - Creates symlinks from ~/.claude (and other agents) to this repo
 - `sync.sh` - Manages syncing items between local and repo
+- `lib.sh` - Shared functions (config parser) used by both scripts
+- `agents.conf` - Config file listing which agents to install skills to
 - `tests/` - Bats test suite
 
 For detailed workflows, see [.claude/rules/workflows.md](.claude/rules/workflows.md).
