@@ -9,13 +9,16 @@
     "deny": [],
     "defaultMode": "default"
   },
-  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
   },
-  "alwaysThinkingEnabled": true,
   "enabledPlugins": {
-    "context7@claude-plugins-official": true
-  }
+    "context7@claude-plugins-official": true,
+    "learn@awesome-slash": true,
+    "enhance@awesome-slash": true,
+    "ship@awesome-slash": true,
+    "railway@railway-skills": true
+  },
+  "alwaysThinkingEnabled": true
 }
