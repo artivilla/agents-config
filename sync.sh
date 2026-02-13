@@ -244,16 +244,25 @@ show_status() {
 
 add_skill() {
     local name="$1"
-    local src="$HOME/.claude/skills/$name"
+    local src=""
+    local src_agent=""
     local dest="$CONFIG_DIR/skills/$name"
 
-    if [ ! -d "$src" ]; then
-        echo "Error: Skill not found at $src"
-        exit 1
-    fi
+    # search all enabled agent skill directories for the skill
+    while IFS=$'\t' read -r agent_name agent_skills_path; do
+        if [ -d "$agent_skills_path/$name" ]; then
+            if [ -L "$agent_skills_path/$name" ] && [[ "$(readlink "$agent_skills_path/$name")" == "$CONFIG_DIR"* ]]; then
+                echo "Error: '$name' is already synced (via $agent_name)"
+                exit 1
+            fi
+            src="$agent_skills_path/$name"
+            src_agent="$agent_name"
+            break
+        fi
+    done < <(get_enabled_agents "$CONFIG_DIR/agents.conf")
 
-    if [ -L "$src" ] && [[ "$(readlink "$src")" == "$CONFIG_DIR"* ]]; then
-        echo "Error: '$name' is already synced"
+    if [ -z "$src" ]; then
+        echo "Error: Skill '$name' not found in any enabled agent's skills directory"
         exit 1
     fi
 
@@ -273,7 +282,7 @@ add_skill() {
         return
     fi
 
-    echo "Adding skill '$name' to repo..."
+    echo "Adding skill '$name' to repo (found in $src_agent)..."
 
     # Create backup before modifying
     local backup_path=$(create_backup)
@@ -287,9 +296,9 @@ add_skill() {
 
     echo -e "${GREEN}✓${RESET} Skill '$name' added and symlinked"
 
-    # symlink to other enabled agents
+    # symlink to all other enabled agents
     while IFS=$'\t' read -r agent_name agent_skills_path; do
-        [[ "$agent_name" == "claude" ]] && continue
+        [[ "$agent_skills_path/$name" == "$src" ]] && continue
         mkdir -p "$agent_skills_path"
         ln -sfn "$dest" "$agent_skills_path/$name"
         echo -e "${GREEN}✓${RESET} Also linked to $agent_name ($agent_skills_path/$name)"
