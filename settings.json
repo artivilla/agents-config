@@ -20,5 +20,6 @@
     "ship@awesome-slash": true,
     "railway@railway-skills": true
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high"
 }
