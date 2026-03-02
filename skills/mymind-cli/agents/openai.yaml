@@ -1,0 +1,7 @@
+interface:
+  display_name: "mymind CLI"
+  short_description: "Run local mymind bookmark search and tag workflows."
+  default_prompt: "Use mymind commands to initialize auth, refresh cache, search bookmarks, and shape output with jq."
+
+policy:
+  allow_implicit_invocation: true
